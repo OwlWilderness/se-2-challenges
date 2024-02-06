@@ -7,13 +7,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /**
  * @title DEX Template
  * @author stevepham.eth and m00npapi.eth
- * @notice Empty DEX.sol that just outlines what features could be part of the challenge (up to you!)
+ * @notice Started Empty DEX.sol that just outlines what features could be part of the challenge (up to you!)
+ * @notice quantumtekh.eth challenge 4
  * @dev We want to create an automatic market where our contract will hold reserves of both ETH and 🎈 Balloons. These reserves will provide liquidity that allows anyone to swap between the assets.
  * NOTE: functions outlined here are what work with the front end of this challenge. Also return variable names need to be specified exactly may be referenced (It may be helpful to cross reference with front-end code function calls).
  */
 contract DEX {
 	/* ========== GLOBAL VARIABLES ========== */
-
+	mapping (address => unit) public liquidity;
+	uint public totalLiquidity;
 	IERC20 token; //instantiates the imported contract
 
 	/* ========== EVENTS ========== */
@@ -70,7 +72,16 @@ contract DEX {
 	 * @return totalLiquidity is the number of LPTs minting as a result of deposits made to DEX contract
 	 * NOTE: since ratio is 1:1, this is fine to initialize the totalLiquidity (wrt to balloons) as equal to eth balance of contract.
 	 */
-	function init(uint256 tokens) public payable returns (uint256) {}
+	function init(uint256 tokens) public payable returns (uint256) {
+		if(totalLiquidity>0){
+			revert("contract aldready has liquidity);
+		}
+		bytes memory xferPayload = abi.encodeWithSignature("transfer(address,uint256)",address(this),tokens);
+		(book success, bytes memory returnData) = address(token).call(xferPayload); //not sure if this will work
+		if(!success){
+			revert("contract init failed. could not transfer tokens")
+		}
+	}
 
 	/**
 	 * @notice returns yOutput, or yDelta for xInput (or xDelta)
