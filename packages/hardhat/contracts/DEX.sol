@@ -14,8 +14,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 contract DEX {
 	/* ========== GLOBAL VARIABLES ========== */
-	mapping (address => unit) public liquidity;
+
+	//add variables for:
+	//total liquidity held by the DEX
+	//liquidity held by each user address
+
+	mapping (address => uint) public liquidity;
 	uint public totalLiquidity;
+
 	IERC20 token; //instantiates the imported contract
 
 	/* ========== EVENTS ========== */
@@ -74,13 +80,17 @@ contract DEX {
 	 */
 	function init(uint256 tokens) public payable returns (uint256) {
 		if(totalLiquidity>0){
-			revert("contract aldready has liquidity);
+			revert("dex already has liquidity");
 		}
-		bytes memory xferPayload = abi.encodeWithSignature("transfer(address,uint256)",address(this),tokens);
-		(book success, bytes memory returnData) = address(token).call(xferPayload); //not sure if this will work
+
+		totalLiquidity = address(this).balance;
+        liquidity[msg.sender] = totalLiquidity;
+        bool success = token.transferFrom(msg.sender, address(this), tokens);
 		if(!success){
-			revert("contract init failed. could not transfer tokens")
+			revert("contract init failed. could not transfer tokens");
 		}
+        return totalLiquidity;
+
 	}
 
 	/**
@@ -91,7 +101,13 @@ contract DEX {
 		uint256 xInput,
 		uint256 xReserves,
 		uint256 yReserves
-	) public pure returns (uint256 yOutput) {}
+	) public pure returns (uint256 yOutput) {
+		//x(amount of ETH in DEX ) * y( amount of tokens in DEX ) = k
+		uint256 xFee = xInput * 997;
+		uint256 n = xFee * yReserves; //xf*yr
+		uint256 d = (xReserves * 1000) + xFee; //xr+xf
+		return n/d; //(xf*yr)/(xr+xf)
+	}
 
 	/**
 	 * @notice returns liquidity for a user.
@@ -99,19 +115,66 @@ contract DEX {
 	 * NOTE: if you are using a mapping liquidity, then you can use `return liquidity[lp]` to get the liquidity for a user.
 	 * NOTE: if you will be submitting the challenge make sure to implement this function as it is used in the tests.
 	 */
-	function getLiquidity(address lp) public view returns (uint256) {}
+	function getLiquidity(address lp) public view returns (uint256) {
+		return liquidity[lp];
+	}
 
 	/**
 	 * @notice sends Ether to DEX in exchange for $BAL
 	 */
-	function ethToToken() public payable returns (uint256 tokenOutput) {}
+	function ethToToken() public payable returns (uint256 tokenOutput) {
+		if(!(msg.value > 0)){
+			revert("eth must be greater than zero");
+		}
+		//can call ethToToken with some ETH in the transaction and it will send us $BAL tokens.
+		//get price 
+		//xInput = msg.value 
+		//xReserves = total liquidity = address(this)balance? or totalLiquidity?
+		//yReserves = $BAL balance of this contract token.balanceOf(address(this))
+
+        uint256 ethReserve = address(this).balance - msg.value;
+		uint tokens = price(msg.value, ethReserve, token.balanceOf(address(this)));
+
+		bool success = token.transferFrom(address(this), msg.sender, tokens);
+		if(!success){
+			revert("contract init failed. could not transfer tokens");
+		}
+
+        emit EthToTokenSwap(msg.sender,tokens,msg.value);
+
+		return tokens;
+
+	}
 
 	/**
 	 * @notice sends $BAL tokens to DEX in exchange for Ether
 	 */
 	function tokenToEth(
 		uint256 tokenInput
-	) public returns (uint256 ethOutput) {}
+	) public returns (uint256 ethOutput) {
+		if(!(tokenInput>0)){
+			revert("tokens must be greater than zero");
+		}
+		//get price 
+		//xInput = tokenInput
+		//yReserves = total liquidity = address(this)balance? or totalLiquidity?
+		//xReserves = $BAL balance of this contract token.balanceOf(address(this))
+		uint eth = price(tokenInput, token.balanceOf(address(this)),totalLiquidity);
+	    
+		bool success = token.transferFrom(msg.sender, address(this), tokenInput);
+		if(!success){
+			revert("contract init failed. could not transfer tokens");
+		}
+
+		(bool sent, ) = msg.sender.call{value: eth}("");
+		if(!sent){
+			revert("could not send eth");
+		}
+
+		emit TokenToEthSwap(msg.sender, tokenInput, eth);
+
+		return eth;
+	}
 
 	/**
 	 * @notice allows deposits of $BAL and $ETH to liquidity pool

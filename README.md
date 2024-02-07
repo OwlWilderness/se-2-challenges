@@ -75,7 +75,7 @@ Navigate to the `Debug Contracts` tab, you should see two smart contracts displa
 
 We want to create an automatic market where our contract will hold reserves of both ETH and 🎈 Balloons. These reserves will provide liquidity that allows anyone to swap between the assets.
 
-Add a couple new variables to `DEX.sol` for `totalLiquidity` and `liquidity`:
+1. Add a couple new variables to `DEX.sol` for `totalLiquidity` in the dex and `liquidity` for each user address:
 
 <details markdown='1'><summary>👩🏽‍🏫 Solution Code</summary>
 
