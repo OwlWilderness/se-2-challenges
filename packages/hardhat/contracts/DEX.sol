@@ -19,9 +19,14 @@ contract DEX {
 	//total liquidity held by the DEX
 	//liquidity held by each user address
 
+	string public Name = "Tekh's Scaffold-Eth 2 Challenge IV";
+	string public Symbol = "khS2GIV";
+
 	mapping (address => uint) public liquidity;
 	uint public totalLiquidity;
-
+	string ERR_ZERO_ETH = "eth must be greater than zero";
+	string ERR_ZERO_BAL = "balloons must be greater than zero";
+	string ERR_TOKEN_XFR = "could not transfer tokens";
 	IERC20 token; //instantiates the imported contract
 
 	/* ========== EVENTS ========== */
@@ -87,8 +92,16 @@ contract DEX {
         liquidity[msg.sender] = totalLiquidity;
         bool success = token.transferFrom(msg.sender, address(this), tokens);
 		if(!success){
-			revert("contract init failed. could not transfer tokens");
+			revert(ERR_TOKEN_XFR);
 		}
+
+		emit LiquidityProvided(
+		 msg.sender,
+		 totalLiquidity,
+		 msg.value,
+		 tokens
+		);
+
         return totalLiquidity;
 
 	}
@@ -106,6 +119,9 @@ contract DEX {
 		uint256 xFee = xInput * 997;
 		uint256 n = xFee * yReserves; //xf*yr
 		uint256 d = (xReserves * 1000) + xFee; //xr+xf
+		if(!d>0){
+			revert("somethings are zero that shouldnt be");
+		}
 		return n/d; //(xf*yr)/(xr+xf)
 	}
 
@@ -124,25 +140,28 @@ contract DEX {
 	 */
 	function ethToToken() public payable returns (uint256 tokenOutput) {
 		if(!(msg.value > 0)){
-			revert("eth must be greater than zero");
+			revert(ERR_ZERO_ETH);
 		}
 		//can call ethToToken with some ETH in the transaction and it will send us $BAL tokens.
-		//get price 
+		//yOutput = price of:
 		//xInput = msg.value 
 		//xReserves = total liquidity = address(this)balance? or totalLiquidity?
 		//yReserves = $BAL balance of this contract token.balanceOf(address(this))
 
-        uint256 ethReserve = address(this).balance - msg.value;
-		uint tokens = price(msg.value, ethReserve, token.balanceOf(address(this)));
+		uint xInput = msg.value;
+        uint xReserves = address(this).balance - msg.value; //eth has already xfered 
+		uint yReserves = token.balanceOf(address(this)); //no tokens have xfered
+		uint yOutput = price(xInput, xReserves, yReserves);
 
-		bool success = token.transferFrom(address(this), msg.sender, tokens);
+		//transfer tokens from this contract to the user (msg.sender)
+		bool success = token.transfer(msg.sender , yOutput);
 		if(!success){
-			revert("contract init failed. could not transfer tokens");
+			revert(ERR_TOKEN_XFR);
 		}
 
-        emit EthToTokenSwap(msg.sender,tokens,msg.value);
+        emit EthToTokenSwap(msg.sender,yOutput,xInput);
 
-		return tokens;
+		return yOutput;
 
 	}
 
@@ -153,27 +172,31 @@ contract DEX {
 		uint256 tokenInput
 	) public returns (uint256 ethOutput) {
 		if(!(tokenInput>0)){
-			revert("tokens must be greater than zero");
+			revert(ERR_ZERO_BAL);
 		}
 		//get price 
 		//xInput = tokenInput
-		//yReserves = total liquidity = address(this)balance? or totalLiquidity?
+		//yReserves = total liquidity = address(this).balance
 		//xReserves = $BAL balance of this contract token.balanceOf(address(this))
-		uint eth = price(tokenInput, token.balanceOf(address(this)),totalLiquidity);
-	    
-		bool success = token.transferFrom(msg.sender, address(this), tokenInput);
+
+		uint xInput = tokenInput;
+        uint xReserves = token.balanceOf(address(this));
+		uint yReserves = address(this).balance;
+		uint yOutput = price(xInput, xReserves, yReserves);
+
+		bool success = token.transferFrom(msg.sender, address(this), xInput);
 		if(!success){
-			revert("contract init failed. could not transfer tokens");
+			revert(ERR_TOKEN_XFR);
 		}
 
-		(bool sent, ) = msg.sender.call{value: eth}("");
+		(bool sent, ) = msg.sender.call{value: yOutput}("");
 		if(!sent){
-			revert("could not send eth");
+			revert("could not send eth.");
 		}
 
-		emit TokenToEthSwap(msg.sender, tokenInput, eth);
+		emit TokenToEthSwap(msg.sender, xInput, yOutput);
 
-		return eth;
+		return yOutput;
 	}
 
 	/**
@@ -182,7 +205,39 @@ contract DEX {
 	 * NOTE: user has to make sure to give DEX approval to spend their tokens on their behalf by calling approve function prior to this function call.
 	 * NOTE: Equal parts of both assets will be removed from the user's wallet with respect to the price outlined by the AMM.
 	 */
-	function deposit() public payable returns (uint256 tokensDeposited) {}
+	function deposit() public payable returns (uint256 tokensDeposited) {
+		//The deposit() function receives ETH 
+		//and also transfers $BAL tokens from the caller to the contract at the right ratio. 
+		//The contract also tracks the amount of liquidity (how many liquidity provider tokens (LPTs) minted) 
+		//the depositing address owns vs the totalLiquidity.
+
+		uint xInput = msg.value;
+        uint xReserves = address(this).balance - msg.value; //eth has already xfered 
+		uint yReserves = token.balanceOf(address(this)); //no tokens have xfered
+		uint yOutput = price(xInput, xReserves, yReserves);
+
+		//verify sender has enough tokens
+		if(token.balanceOf(msg.sender) < yOutput){
+			revert("not enough tokens.")
+		}
+		
+		//transfer tokens
+	    bool success = token.transferFrom(msg.sender, address(this), yOutput);
+		if(!success){
+			revert(ERR_TOKEN_XFR);
+		}
+
+		//update liquidity 
+		totalLiquidity = totalLiquidity + msg.value;
+		liquidity[msg.sender] = liquidity[msg.sender] + msg.value;
+
+		emit LiquidityProvided(
+			 msg.sender,
+			 msg.value,
+			 msg.value,
+			 yOutput
+		);
+	}
 
 	/**
 	 * @notice allows withdrawal of $BAL and $ETH from liquidity pool
