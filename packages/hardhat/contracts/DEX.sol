@@ -27,6 +27,8 @@ contract DEX {
 	string ERR_ZERO_ETH = "eth must be greater than zero";
 	string ERR_ZERO_BAL = "balloons must be greater than zero";
 	string ERR_TOKEN_XFR = "could not transfer tokens";
+	string ERR_ETH_XFR = "failed to transfer liquidity";
+
 	IERC20 token; //instantiates the imported contract
 
 	/* ========== EVENTS ========== */
@@ -191,7 +193,7 @@ contract DEX {
 
 		(bool sent, ) = msg.sender.call{value: yOutput}("");
 		if(!sent){
-			revert("could not send eth.");
+			revert(ERR_ETH_XFR);
 		}
 
 		emit TokenToEthSwap(msg.sender, xInput, yOutput);
@@ -199,14 +201,28 @@ contract DEX {
 		return yOutput;
 	}
 
-	function getSwapValues(uint value) public view returns (uint tokenDeposit, uint liquidityMinted){
-        uint xReserves = address(this).balance - value; //eth has already xfered 
+	function getWithdrawSwapValues(uint value) public view returns (uint tokenWithdraw, uint liquidityRemoved){
+		//get reserves
+		uint xReserves = address(this).balance;
+		uint yReserves = token.balanceOf(address(this));
+
+		//calculate withdraw amounts. The equation is: amount * reserveOfDesiredUnits / totalLiquidity
+		uint bal = value * yReserves / totalLiquidity;
+		uint lp = value * xReserves / totalLiquidity;
+
+		return (bal, lp);
+	}
+
+	function getDepositSwapValues(uint value) public view returns (uint tokenDeposit, uint liquidityMinted){
+        //get reserves
+		uint xReserves = address(this).balance - value; //eth has already xfered 
 		uint yReserves = token.balanceOf(address(this)); //no tokens have xfered
 
-		tokenDeposit = ((value * yReserves)/xReserves) + 1;
-		liquidityMinted = ((value * xReserves)/yReserves);
+		//caluclate deposit amounts
+		uint bal = ((value * yReserves)/xReserves) + 1;
+		uint lp = ((value * totalLiquidity)/xReserves);
 
-		return (tokenDeposit, liquidityMinted);
+		return (bal, lp);
 	}
 
 	
@@ -225,7 +241,7 @@ contract DEX {
 		//The contract also tracks the amount of liquidity (how many liquidity provider tokens (LPTs) minted) 
 		//the depositing address owns vs the totalLiquidity.
 
-		(uint tokenDeposit, uint liquidityMinted) = getSwapValues(msg.value);
+		(uint tokenDeposit, uint liquidityMinted) = getDepositSwapValues(msg.value);
 
 		//verify sender has enough tokens
 		if(token.balanceOf(msg.sender) < tokenDeposit){
@@ -239,8 +255,8 @@ contract DEX {
 		}
 
 		//update liquidity 
-		totalLiquidity = totalLiquidity + liquidityMinted;
-		liquidity[msg.sender] = liquidity[msg.sender] + liquidityMinted;
+		totalLiquidity += liquidityMinted;
+		liquidity[msg.sender] += liquidityMinted;
 
 		emit LiquidityProvided(
 			 msg.sender,
@@ -248,6 +264,8 @@ contract DEX {
 			 msg.value,
 			 tokenDeposit
 		);
+
+		return tokenDeposit;
 	}
 
 	/**
@@ -256,5 +274,39 @@ contract DEX {
 	 */
 	function withdraw(
 		uint256 amount
-	) public returns (uint256 eth_amount, uint256 token_amount) {}
+	) public returns (uint256 eth_amount, uint256 token_amount) {
+		if(amount > liquidity[msg.sender]){
+			revert("amount higher then lp share");
+		}
+
+		//get witdraw swap getWithdrawSwapValues
+		(uint tokenWithdraw, uint liquidityRemoved) = getWithdrawSwapValues(amount);
+
+		//send liquidity
+		(bool lsent, ) = msg.sender.call{value: liquidityRemoved}("");
+		if(!lsent){
+			revert(ERR_ETH_XFR);
+		}
+
+		//send tokens;
+		bool bsent = token.transfer(msg.sender, tokenWithdraw);
+		if(!bsent){
+			revert(ERR_TOKEN_XFR);
+		}
+
+		//update liquidity 
+		totalLiquidity -= liquidityRemoved;
+		liquidity[msg.sender] -= liquidityRemoved;
+
+		emit LiquidityRemoved(
+			 msg.sender,
+			 amount,
+			 tokenWithdraw,
+			 liquidityRemoved
+		);
+
+		return (liquidityRemoved, tokenWithdraw);
+
+	}
+
 }

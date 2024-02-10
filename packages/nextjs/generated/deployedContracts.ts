@@ -5,7 +5,7 @@ const contracts = {
       name: "localhost",
       contracts: {
         Balloons: {
-          address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+          address: "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
           abi: [
             {
               inputs: [],
@@ -285,7 +285,7 @@ const contracts = {
           ],
         },
         DEX: {
-          address: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+          address: "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
           abi: [
             {
               inputs: [
@@ -465,6 +465,30 @@ const contracts = {
             {
               inputs: [
                 {
+                  internalType: "uint256",
+                  name: "value",
+                  type: "uint256",
+                },
+              ],
+              name: "getDepositSwapValues",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "tokenDeposit",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "liquidityMinted",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
                   internalType: "address",
                   name: "lp",
                   type: "address",
@@ -489,16 +513,16 @@ const contracts = {
                   type: "uint256",
                 },
               ],
-              name: "getSwapValues",
+              name: "getWithdrawSwapValues",
               outputs: [
                 {
                   internalType: "uint256",
-                  name: "tokenDeposit",
+                  name: "tokenWithdraw",
                   type: "uint256",
                 },
                 {
                   internalType: "uint256",
-                  name: "liquidityMinted",
+                  name: "liquidityRemoved",
                   type: "uint256",
                 },
               ],
