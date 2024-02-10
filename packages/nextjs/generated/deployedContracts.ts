@@ -5,7 +5,7 @@ const contracts = {
       name: "localhost",
       contracts: {
         Balloons: {
-          address: "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
+          address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
           abi: [
             {
               inputs: [],
@@ -285,7 +285,7 @@ const contracts = {
           ],
         },
         DEX: {
-          address: "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf",
+          address: "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
           abi: [
             {
               inputs: [
@@ -412,6 +412,32 @@ const contracts = {
             },
             {
               inputs: [],
+              name: "Name",
+              outputs: [
+                {
+                  internalType: "string",
+                  name: "",
+                  type: "string",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [],
+              name: "Symbol",
+              outputs: [
+                {
+                  internalType: "string",
+                  name: "",
+                  type: "string",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [],
               name: "deposit",
               outputs: [
                 {
@@ -449,6 +475,30 @@ const contracts = {
                 {
                   internalType: "uint256",
                   name: "",
+                  type: "uint256",
+                },
+              ],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [
+                {
+                  internalType: "uint256",
+                  name: "value",
+                  type: "uint256",
+                },
+              ],
+              name: "getSwapValues",
+              outputs: [
+                {
+                  internalType: "uint256",
+                  name: "tokenDeposit",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "liquidityMinted",
                   type: "uint256",
                 },
               ],

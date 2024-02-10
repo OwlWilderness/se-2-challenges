@@ -51,7 +51,11 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
          "0xfD9Fc8DB194bFEa9e45a19F285F895E99445d7dC",
          "" + 10 * 10 ** 18
      );
-
+     await balloons.transfer(
+      "0x4680B36a4e742092F4D90a94288581B515a8791F",
+      "" + 10 * 10 ** 18
+  );
+     
 
     // uncomment to init DEX on deploy:
 

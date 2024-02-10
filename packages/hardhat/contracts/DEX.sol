@@ -119,7 +119,7 @@ contract DEX {
 		uint256 xFee = xInput * 997;
 		uint256 n = xFee * yReserves; //xf*yr
 		uint256 d = (xReserves * 1000) + xFee; //xr+xf
-		if(!d>0){
+		if(!(d>0)){
 			revert("somethings are zero that shouldnt be");
 		}
 		return n/d; //(xf*yr)/(xr+xf)
@@ -199,6 +199,17 @@ contract DEX {
 		return yOutput;
 	}
 
+	function getSwapValues(uint value) public view returns (uint tokenDeposit, uint liquidityMinted){
+        uint xReserves = address(this).balance - value; //eth has already xfered 
+		uint yReserves = token.balanceOf(address(this)); //no tokens have xfered
+
+		tokenDeposit = ((value * yReserves)/xReserves) + 1;
+		liquidityMinted = ((value * xReserves)/yReserves);
+
+		return (tokenDeposit, liquidityMinted);
+	}
+
+	
 	/**
 	 * @notice allows deposits of $BAL and $ETH to liquidity pool
 	 * NOTE: parameter is the msg.value sent with this function call. That amount is used to determine the amount of $BAL needed as well and taken from the depositor.
@@ -206,36 +217,36 @@ contract DEX {
 	 * NOTE: Equal parts of both assets will be removed from the user's wallet with respect to the price outlined by the AMM.
 	 */
 	function deposit() public payable returns (uint256 tokensDeposited) {
+		if(!(msg.value > 0)){
+			revert(ERR_ZERO_ETH);
+		}
 		//The deposit() function receives ETH 
 		//and also transfers $BAL tokens from the caller to the contract at the right ratio. 
 		//The contract also tracks the amount of liquidity (how many liquidity provider tokens (LPTs) minted) 
 		//the depositing address owns vs the totalLiquidity.
 
-		uint xInput = msg.value;
-        uint xReserves = address(this).balance - msg.value; //eth has already xfered 
-		uint yReserves = token.balanceOf(address(this)); //no tokens have xfered
-		uint yOutput = price(xInput, xReserves, yReserves);
+		(uint tokenDeposit, uint liquidityMinted) = getSwapValues(msg.value);
 
 		//verify sender has enough tokens
-		if(token.balanceOf(msg.sender) < yOutput){
-			revert("not enough tokens.")
+		if(token.balanceOf(msg.sender) < tokenDeposit){
+			revert("not enough tokens.");
 		}
 		
 		//transfer tokens
-	    bool success = token.transferFrom(msg.sender, address(this), yOutput);
+	    bool success = token.transferFrom(msg.sender, address(this), tokenDeposit);
 		if(!success){
 			revert(ERR_TOKEN_XFR);
 		}
 
 		//update liquidity 
-		totalLiquidity = totalLiquidity + msg.value;
-		liquidity[msg.sender] = liquidity[msg.sender] + msg.value;
+		totalLiquidity = totalLiquidity + liquidityMinted;
+		liquidity[msg.sender] = liquidity[msg.sender] + liquidityMinted;
 
 		emit LiquidityProvided(
 			 msg.sender,
+			 liquidityMinted,
 			 msg.value,
-			 msg.value,
-			 yOutput
+			 tokenDeposit
 		);
 	}
 
